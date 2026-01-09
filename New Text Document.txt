@@ -1,0 +1,75 @@
+import torch
+import soundfile as sf
+from transformers import Wav2Vec2Processor, Wav2Vec2Model
+from phonemizer import phonemize
+from dtw import dtw
+
+print("🔹 Loading wav2vec2 model...")
+
+processor = Wav2Vec2Processor.from_pretrained(
+    "facebook/wav2vec2-base-960h"
+)
+model = Wav2Vec2Model.from_pretrained(
+    "facebook/wav2vec2-base-960h"
+)
+
+# -------- Speech Embeddings --------
+def extract_embeddings(audio_path):
+    audio, sr = sf.read(audio_path)
+
+    inputs = processor(
+        audio,
+        sampling_rate=sr,
+        return_tensors="pt",
+        padding=True
+    )
+
+    with torch.no_grad():
+        out = model(**inputs)
+
+    return out.last_hidden_state.squeeze(0)
+
+# -------- Text → Phonemes --------
+def text_to_phonemes(text):
+    ph = phonemize(
+        text,
+        language="en-us",
+        backend="espeak",
+        strip=True
+    )
+    return ph.split()
+
+# -------- Phoneme Distance Score --------
+def phoneme_distance(expected, spoken_emb):
+    exp = torch.arange(len(expected)).unsqueeze(1)
+
+    dist, _, _, _ = dtw(
+        exp.numpy(),
+        spoken_emb.numpy(),
+        dist=lambda x,y: 0 if x==y else 1
+    )
+
+    return dist / len(expected)
+
+THRESHOLD = 0.35
+
+def detect_mispronunciation(expected_text, audio_path):
+    expected_ph = text_to_phonemes(expected_text)
+    spoken_emb = extract_embeddings(audio_path)
+
+    score = phoneme_distance(expected_ph, spoken_emb)
+
+    print("\nExpected phonemes:", expected_ph)
+    print("Score:", round(score, 3))
+
+    if score > THRESHOLD:
+        print("⚠ Result: MISPRONOUNCED")
+    else:
+        print("✅ Result: PRONUNCIATION OK")
+
+
+# ---------- TEST INPUT ----------
+EXPECTED_TEXT = "The boy went to school"
+AUDIO_FILE = "sample.wav"
+
+detect_mispronunciation(EXPECTED_TEXT, AUDIO_FILE)

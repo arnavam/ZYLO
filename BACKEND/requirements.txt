@@ -1,0 +1,13 @@
+flask==2.3.3
+flask-cors==4.0.0
+flask-jwt-extended
+pymongo
+bcrypt
+pyttsx3==2.90
+SpeechRecognition==3.10.0
+PyPDF2==3.0.1
+python-dotenv==1.0.0
+transformers
+torch
+numpy
+scipy

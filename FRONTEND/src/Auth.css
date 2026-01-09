@@ -1,0 +1,277 @@
+/* ===============================
+   GLOBAL RESET
+================================ */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #020617;
+}
+
+/* ===============================
+   AUTH CONTAINER & BACKGROUND
+================================ */
+.auth-container {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    color: #e5e7eb;
+}
+
+.auth-background {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top, #1e293b, #020617);
+    z-index: -2;
+}
+
+/* Floating orbs */
+.floating-orb {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.5), transparent 70%);
+    border-radius: 50%;
+    filter: blur(40px);
+    animation: float 10s infinite alternate ease-in-out;
+    z-index: -1;
+}
+
+.orb1 {
+    top: 10%;
+    left: 10%;
+}
+
+.orb2 {
+    bottom: 15%;
+    right: 15%;
+    animation-delay: 3s;
+}
+
+.orb3 {
+    top: 40%;
+    right: 30%;
+    animation-delay: 6s;
+}
+
+@keyframes float {
+    from {
+        transform: translateY(0);
+    }
+
+    to {
+        transform: translateY(-40px);
+    }
+}
+
+/* ===============================
+   AUTH CARD
+================================ */
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 2.5rem;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+/* ===============================
+   LOGO & HEADER
+================================ */
+.auth-logo {
+    text-align: center;
+    margin-bottom: 1.8rem;
+}
+
+.auth-logo-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.auth-title {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+.auth-subtitle {
+    margin-top: 0.4rem;
+    font-size: 0.9rem;
+    color: #94a3b8;
+}
+
+/* ===============================
+   FORM
+================================ */
+.auth-form {
+    margin-top: 1rem;
+}
+
+.form-group {
+    position: relative;
+    margin-bottom: 1.3rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+    color: #cbd5f5;
+}
+
+.input-icon {
+    position: absolute;
+    left: 10px;
+    top: 38px;
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    background: #020617;
+    color: #e5e7eb;
+    outline: none;
+}
+
+.form-group input::placeholder {
+    color: #64748b;
+}
+
+.form-group input:focus {
+    border-color: #3b82f6;
+}
+
+/* ===============================
+   PASSWORD STRENGTH (SIGN UP)
+================================ */
+.password-strength {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.strength-bar {
+    flex: 1;
+    height: 5px;
+    background: #334155;
+    border-radius: 5px;
+}
+
+.strength-bar.weak {
+    background: #ef4444;
+}
+
+.strength-bar.medium {
+    background: #f59e0b;
+}
+
+.strength-bar.strong {
+    background: #22c55e;
+}
+
+.strength-text {
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+/* ===============================
+   ERROR MESSAGE
+================================ */
+.auth-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #fecaca;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+/* ===============================
+   SUBMIT BUTTON
+================================ */
+.auth-submit {
+    width: 100%;
+    padding: 12px;
+    margin-top: 0.5rem;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+.auth-submit:hover {
+    transform: translateY(-1px);
+    opacity: 0.95;
+}
+
+.auth-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Loading spinner */
+.btn-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid white;
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ===============================
+   SWITCH LINK
+================================ */
+.auth-switch {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+}
+
+.auth-switch a {
+    color: #60a5fa;
+    text-decoration: none;
+}
+
+.auth-switch a:hover {
+    text-decoration: underline;
+}
+
+/* ===============================
+   MOBILE RESPONSIVE
+================================ */
+@media (max-width: 480px) {
+    .auth-card {
+        padding: 2rem;
+        margin: 1rem;
+    }
+}
