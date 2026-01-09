@@ -6,6 +6,8 @@ from datetime import timedelta
 from config import Config
 from dotenv import load_dotenv
 import os
+import shutil
+
 
 # Load environment variables
 load_dotenv()
@@ -19,6 +21,13 @@ from routes.practice_routes import practice_bp
 from routes.selection_routes import selection_bp
 from routes.auth_routes import auth_bp
 from routes.history_routes import history_bp
+
+# 🔍 Check eSpeak availability at startup
+if not (shutil.which("espeak") or shutil.which("espeak-ng")):
+    raise RuntimeError(
+        "eSpeak not available in PATH. Please install eSpeak or eSpeak-NG."
+    )
+
 
 
 def create_app():

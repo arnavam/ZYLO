@@ -597,3 +597,25 @@ select.btn option {
     transform: translateX(120vw) translateZ(100px) rotateY(10deg);
   }
 }
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 101, 101, 0.7);
+  }
+
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(245, 101, 101, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 101, 101, 0);
+  }
+}
+
+.pulse {
+  animation: pulse 1.5s infinite;
+  background: #f56565 !important;
+}

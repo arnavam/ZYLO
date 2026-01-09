@@ -11,17 +11,24 @@ def init_db():
     global client, db
     mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/dyslexia_assistant')
     try:
-        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        # Reduced timeout for faster error feedback in dev
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=2000)
         client.server_info()
         db = client.get_database()
         print(f'[OK] Connected to MongoDB: {db.name}')
+        return db
     except Exception as e:
+        db = None
         print(f'[ERROR] Could not connect to MongoDB: {e}')
+        return None
 
 def get_db():
     global db
     if db is None:
-        init_db()
+        db = init_db()
+    
+    if db is None:
+        raise ConnectionError("MongoDB is not running or accessible. Please ensure the MongoDB service is started.")
     return db
 
 def get_users_collection():

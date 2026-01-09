@@ -8,6 +8,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
 const DocumentReader = ({
   onClose,
+  sentences: parentSentences,
+  currentIndex: parentIndex,
+  onJumpTo,
   currentPdfName,
   pdfUrl,
   isReading: parentIsReading,
@@ -15,7 +18,9 @@ const DocumentReader = ({
   onReadAloud,
   onPractice,
   onSpeedChange,
-  isProcessing
+  isProcessing,
+  practiceResult,
+  wordFeedback: parentWordFeedback
 }) => {
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
@@ -28,8 +33,20 @@ const DocumentReader = ({
 
   // --- STATE ---
   const [localSentences, setLocalSentences] = useState([]);
-  const [activeSentenceIndex, setActiveSentenceIndex] = useState(0);
+  const [activeSentenceIndex, setActiveSentenceIndex] = useState(parentIndex || 0);
   const [domItemsMap, setDomItemsMap] = useState([]); // Array of arrays: sentenceIdx -> element list
+
+  // Sync with parent index
+  useEffect(() => {
+    if (parentIndex !== undefined && parentIndex !== activeSentenceIndex) {
+      setActiveSentenceIndex(parentIndex);
+    }
+  }, [parentIndex]);
+
+  // --- RECORDING STATE ---
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   // Load voices
   useEffect(() => {
@@ -48,6 +65,120 @@ const DocumentReader = ({
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages);
     setLoading(false);
+  };
+
+  // --- RECORDING LOGIC ---
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const webmBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+        try {
+          // Convert WebM to WAV (16kHz mono) for backend compatibility
+          console.log("Converting recording to WAV...");
+          const wavBlob = await convertToWav(webmBlob);
+          onPractice(wavBlob);
+        } catch (err) {
+          console.error("WAV Conversion error:", err);
+          // Fallback to original blob if conversion fails
+          onPractice(webmBlob);
+        }
+
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("Could not access microphone. Please check permissions.");
+    }
+  };
+
+  const convertToWav = async (blob) => {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    // Get PCM data from mono (or first channel)
+    const pcmData = audioBuffer.getChannelData(0);
+    const wavBuffer = encodeWav(pcmData, 16000);
+
+    return new Blob([wavBuffer], { type: 'audio/wav' });
+  };
+
+  const encodeWav = (samples, sampleRate) => {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+
+    // RIFF identifier
+    writeString(view, 0, 'RIFF');
+    // RIFF chunk length
+    view.setUint32(4, 36 + samples.length * 2, true);
+    // RIFF type
+    writeString(view, 8, 'WAVE');
+    // format chunk identifier
+    writeString(view, 12, 'fmt ');
+    // format chunk length
+    view.setUint32(16, 16, true);
+    // sample format (raw)
+    view.setUint16(20, 1, true);
+    // channel count
+    view.setUint16(22, 1, true);
+    // sample rate
+    view.setUint32(24, sampleRate, true);
+    // byte rate (sample rate * block align)
+    view.setUint32(28, sampleRate * 2, true);
+    // block align (channel count * bytes per sample)
+    view.setUint16(32, 2, true);
+    // bits per sample
+    view.setUint16(34, 16, true);
+    // data chunk identifier
+    writeString(view, 36, 'data');
+    // data chunk length
+    view.setUint32(40, samples.length * 2, true);
+
+    // Write the PCM samples
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++, offset += 2) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+
+    return buffer;
+  };
+
+  const writeString = (view, offset, string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handlePracticeClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   // --- CORE LOGIC: SENTENCE HIGHLIGHTING ---
@@ -155,6 +286,7 @@ const DocumentReader = ({
 
   const handleSentenceClick = (index) => {
     setActiveSentenceIndex(index);
+    if (onJumpTo) onJumpTo(index);
     // If not currently reading, maybe start? Or just select.
     // For now just select. If reading, it will pick up from here.
     if (parentIsReading) {
@@ -216,8 +348,8 @@ const DocumentReader = ({
         }
       };
 
-      utterance.onerror = () => {
-        console.error("Speech synthesis error");
+      utterance.onerror = (event) => {
+        console.error("Speech synthesis error:", event.error, event);
       };
 
       window.speechSynthesis.speak(utterance);
@@ -228,17 +360,56 @@ const DocumentReader = ({
     }
   }, [parentIsReading, activeSentenceIndex, localSentences, readingSpeed, selectedVoice]);
 
+  // --- LIVELY CORRECTION LOGIC ---
+  const getWordFeedback = () => {
+    if (!practiceResult || !localSentences[activeSentenceIndex]) return [];
+
+    const expected = localSentences[activeSentenceIndex].text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
+    const spoken = (practiceResult.result?.spoken_text || "").toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
+
+    return expected.map((word, i) => ({
+      word,
+      correct: spoken.includes(word) // Simple check, can be improved with alignment
+    }));
+  };
+
+  const wordFeedback = getWordFeedback();
+
+  // Auto-correction audio
+  useEffect(() => {
+    if (practiceResult && practiceResult.result && practiceResult.result.score < 0.85) {
+      const missedWords = wordFeedback
+        .filter(w => !w.correct)
+        .map(w => w.word);
+
+      if (missedWords.length > 0) {
+        window.speechSynthesis.cancel();
+        const correctionText = `Let's try these words again: ${missedWords.join(", ")}`;
+        const utterance = new SpeechSynthesisUtterance(correctionText);
+        if (selectedVoice) utterance.voice = selectedVoice;
+        utterance.rate = 0.9; // Slightly slower for correction
+
+        setTimeout(() => {
+          window.speechSynthesis.speak(utterance);
+        }, 1000);
+      }
+    }
+  }, [practiceResult]);
+
   const handleNextSentence = () => {
-    if (activeSentenceIndex < localSentences.length - 1) setActiveSentenceIndex(prev => prev + 1);
+    if (activeSentenceIndex < localSentences.length - 1) {
+      const nextIndex = activeSentenceIndex + 1;
+      setActiveSentenceIndex(nextIndex);
+      if (onJumpTo) onJumpTo(nextIndex);
+    }
   };
 
   const handlePrevSentence = () => {
-    if (activeSentenceIndex > 0) setActiveSentenceIndex(prev => prev - 1);
-  };
-
-  const handlePracticeClick = () => {
-    const text = localSentences[activeSentenceIndex]?.text;
-    if (text) onPractice(text);
+    if (activeSentenceIndex > 0) {
+      const prevIndex = activeSentenceIndex - 1;
+      setActiveSentenceIndex(prevIndex);
+      if (onJumpTo) onJumpTo(prevIndex);
+    }
   };
 
   return (
@@ -266,7 +437,24 @@ const DocumentReader = ({
 
           <div style={{ fontSize: '0.9rem', color: '#e2e8f0', backgroundColor: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '6px', maxHeight: '150px', overflowY: 'auto' }}>
             {localSentences.length > 0 ? (
-              localSentences[activeSentenceIndex]?.text
+              practiceResult ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {wordFeedback.map((w, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        color: w.correct ? '#48BB78' : '#F56565',
+                        fontWeight: w.correct ? 'normal' : 'bold',
+                        textDecoration: w.correct ? 'none' : 'underline'
+                      }}
+                    >
+                      {w.word}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                localSentences[activeSentenceIndex]?.text
+              )
             ) : (
               <div style={{ color: '#a0aec0' }}>
                 {loading ? "Loading PDF..." : "Extracting text..."}
@@ -274,10 +462,32 @@ const DocumentReader = ({
             )}
           </div>
 
+          {practiceResult && (
+            <div className="practice-feedback fade-in" style={{ marginTop: '10px', padding: '10px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                <span style={{ fontSize: '0.8rem', color: '#a0aec0' }}>Accuracy Score:</span>
+                <span style={{ fontWeight: 'bold', color: practiceResult.result.score >= 0.85 ? '#48BB78' : '#ED8936' }}>
+                  {Math.round(practiceResult.result.score * 100)}%
+                </span>
+              </div>
+              <p style={{ fontSize: '0.85rem', margin: 0, fontStyle: 'italic' }}>
+                {practiceResult.result.feedback}
+              </p>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '8px', marginTop: '15px' }}>
-            <button onClick={handlePracticeClick} className="btn btn-primary" style={{ flex: 1 }}>🎤 Practice</button>
+            <button
+              onClick={handlePracticeClick}
+              className={`btn ${isRecording ? 'btn-danger pulse' : 'btn-primary'}`}
+              style={{ flex: 1 }}
+              disabled={isProcessing}
+            >
+              {isRecording ? '⏹ Stop' : '🎤 Practice'}
+            </button>
             <button onClick={handleNextSentence} className="btn btn-success" style={{ flex: 1, backgroundColor: '#48BB78' }}>Continue ➡</button>
           </div>
+          {isRecording && <p style={{ color: '#ff5252', fontSize: '0.8rem', textAlign: 'center', marginTop: '5px' }}>Recording in progress...</p>}
         </div>
 
         <div className="control-group">

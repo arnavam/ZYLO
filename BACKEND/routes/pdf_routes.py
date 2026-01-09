@@ -1,6 +1,7 @@
 # backend/routes/pdf_routes.py
 from flask import Blueprint, request, jsonify
 import os
+import uuid
 from config import Config
 from models.pdf_processor import PDFProcessor
 import tempfile
@@ -29,24 +30,26 @@ def upload_pdf():
     try:
         print(f"[PDF] Processing PDF: {pdf_file.filename}")
         
-        # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-            pdf_file.save(temp_file.name)
-            temp_path = temp_file.name
+        # Save uploaded file to static/uploads
+        filename = f"{uuid.uuid4()}_{pdf_file.filename}"
+        file_path = os.path.join(Config.UPLOAD_FOLDER, filename)
+        pdf_file.save(file_path)
         
         # Extract text from PDF
-        sentences = pdf_processor.extract_text_with_positions(temp_path)
+        sentences = pdf_processor.extract_text_with_positions(file_path)
         
-        # Clean up temp file
-        os.unlink(temp_path)
+        # Generate the public URL for the PDF
+        # Since the frontend uses a proxy, we can return the relative path from the root
+        pdf_url = f"/static/uploads/{filename}"
         
         print(f"[OK] PDF processed successfully: {len(sentences)} sentences found")
         
         response_data = {
             'success': True,
             'filename': pdf_file.filename,
+            'pdf_url': pdf_url,
             'total_sentences': len(sentences),
-            'pages': len(pdf_processor.page_texts),
+            'pages': pdf_processor.pages,
             'sentences': sentences,
             'stats': pdf_processor.get_sentence_stats()
         }
@@ -55,6 +58,8 @@ def upload_pdf():
         
     except Exception as e:
         print(f"[ERROR] PDF processing error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @pdf_bp.route('/pdf-info', methods=['GET'])

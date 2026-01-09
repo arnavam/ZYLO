@@ -14,11 +14,11 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 // Protected Route Component
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
-    return <div className="loading-screen" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.5rem'}}>Loading...</div>;
+    return <div className="loading-screen" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.5rem' }}>Loading...</div>;
   }
-  
+
   return user ? children : <Navigate to="/signin" />;
 };
 
@@ -49,12 +49,12 @@ function ReadingAssistant() {
     try {
       const formData = new FormData();
       formData.append('pdf', file);
-      
+
       const response = await axios.post('/api/pdf/upload-pdf', formData, {
-         headers: { 'Content-Type': 'multipart/form-data' },
-         withCredentials: true
+        headers: { 'Content-Type': 'multipart/form-data' },
+        withCredentials: true
       });
-      
+
       if (response.data.success) {
         setAllSentences(response.data.sentences);
         setPdfUrl(response.data.pdf_url);
@@ -100,17 +100,17 @@ function ReadingAssistant() {
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob);
-      formData.append('text', allSentences[currentSentenceIndex].text);
-      
+      formData.append('word', allSentences[currentSentenceIndex].text);
+
       const response = await axios.post('/api/practice/evaluate-pronunciation', formData, {
-         withCredentials: true
+        withCredentials: true
       });
-      
+
       if (response.data.success) {
         setPracticeResult(response.data);
         setWordFeedback(response.data.word_feedback || []);
         setFeedback(response.data.feedback);
-        
+
         setSessionStats(prev => ({
           ...prev,
           totalAttempts: prev.totalAttempts + 1,
@@ -163,14 +163,14 @@ function ReadingAssistant() {
 
   return (
     <div className="App">
-      <div className="auth-header-info" style={{position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 1000}}>
-        <span className="user-name-display" style={{color: '#fff', fontWeight: '500'}}>{user?.name}</span>
-        <button onClick={logout} className="logout-btn" style={{background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '5px 12px', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.3s'}}>Logout</button>
+      <div className="auth-header-info" style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 1000 }}>
+        <span className="user-name-display" style={{ color: '#fff', fontWeight: '500' }}>{user?.name}</span>
+        <button onClick={logout} className="logout-btn" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '5px 12px', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.3s' }}>Logout</button>
       </div>
       <Header />
-      
+
       {currentView === 'reading' ? (
-        <DocumentReader 
+        <DocumentReader
           sentences={allSentences}
           currentIndex={currentSentenceIndex}
           onJumpTo={jumpToSentence}
@@ -183,6 +183,7 @@ function ReadingAssistant() {
           onPractice={practiceCurrentSentence}
           onSpeedChange={setReadingSpeed}
           isProcessing={isProcessing}
+          practiceResult={practiceResult}
         />
       ) : (
         <div className="container">

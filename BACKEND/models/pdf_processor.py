@@ -15,6 +15,8 @@ class PDFProcessor:
 
     def __init__(self):
         self.words: List[Dict[str, Any]] = []
+        self.sentences: List[Dict[str, Any]] = []
+        self.page_texts: List[str] = []
         self.pages: int = 0
         self.current_pdf_path: str | None = None
 
@@ -24,7 +26,6 @@ class PDFProcessor:
     def load_pdf(self, pdf_path: str) -> List[Dict[str, Any]]:
         """
         Load a PDF file and extract all words with positions.
-        Must be called BEFORE any highlighting.
         """
         self.words = []
         self.pages = 0
@@ -55,72 +56,80 @@ class PDFProcessor:
 
         return self.words
 
+    def extract_text_with_positions(self, pdf_path: str) -> List[Dict[str, Any]]:
+        """
+        Extract text from PDF and split into sentences with page/line info.
+        This matches the structure expected by the frontend.
+        """
+        self.sentences = []
+        self.page_texts = []
+        self.current_pdf_path = pdf_path
+        
+        import re
+        
+        with pdfplumber.open(pdf_path) as pdf:
+            self.pages = len(pdf.pages)
+            for page_num, page in enumerate(pdf.pages):
+                text = page.extract_text() or ""
+                self.page_texts.append(text)
+                
+                # Simple sentence splitting
+                # In a real app, use nltk or spacy for better sentence segmentation
+                raw_sentences = re.split(r'(?<=[.!?])\s+', text)
+                
+                line_in_page = 1
+                for s_text in raw_sentences:
+                    s_text = s_text.strip()
+                    if len(s_text) > 5:  # Ignore very short fragments
+                        self.sentences.append({
+                            'text': s_text,
+                            'page': page_num + 1,
+                            'line': line_in_page,
+                            'selected': False,
+                            'global_index': len(self.sentences)
+                        })
+                        line_in_page += 1
+                        
+        return self.sentences
+
     # --------------------------------------------------
-    # WORD SELECTION
+    # SENTENCE SELECTION & MANAGEMENT
     # --------------------------------------------------
-    def update_word_selection(self, word_ids: List[str], selected: bool = True):
-        """
-        Mark words as selected/unselected
-        """
-        word_id_set = set(word_ids)
-        for w in self.words:
-            if w["id"] in word_id_set:
-                w["selected"] = selected
+    def update_sentence_selection(self, sentence_indices: List[int], selected: bool = True):
+        """Mark specific sentences as selected/unselected by their global index"""
+        for idx in sentence_indices:
+            if 0 <= idx < len(self.sentences):
+                self.sentences[idx]['selected'] = selected
 
-    def get_selected_words(self) -> List[Dict[str, Any]]:
-        """
-        Return all selected words
-        """
-        return [w for w in self.words if w["selected"]]
+    def get_selected_sentences(self) -> List[Dict[str, Any]]:
+        """Return all selected sentences"""
+        return [s for s in self.sentences if s.get('selected')]
 
-    # --------------------------------------------------
-    # PRACTICE TRACKING
-    # --------------------------------------------------
-    def record_practice_result(self, word_id: str, success: bool):
-        """
-        Track reading/practice attempts per word
-        """
-        for w in self.words:
-            if w["id"] == word_id:
-                w["read_count"] += 1
-                if success:
-                    w["success_count"] += 1
-                break
-
-    # --------------------------------------------------
-    # HIGHLIGHT WORDS IN PDF
-    # --------------------------------------------------
-    def highlight_words(self, word_ids: List[str], output_path: str):
-        """
-        Generate a new PDF with highlighted words
-        """
-        if not self.current_pdf_path:
-            raise RuntimeError("No PDF loaded. Call load_pdf() first.")
-
-        doc = fitz.open(self.current_pdf_path)
-        word_map = {w["id"]: w for w in self.words}
-
-        for wid in word_ids:
-            w = word_map.get(wid)
-            if not w:
-                continue
-
-            page = doc[w["page"]]
-            rect = fitz.Rect(w["x0"], w["y0"], w["x1"], w["y1"])
-            page.add_highlight_annot(rect)
-
-        doc.save(output_path)
+    def update_sentence_text(self, index: int, new_text: str):
+        """Update the text of a sentence (customization)"""
+        if 0 <= index < len(self.sentences):
+            self.sentences[index]['text'] = new_text
 
     # --------------------------------------------------
     # STATS
     # --------------------------------------------------
+    def get_sentence_stats(self) -> Dict[str, Any]:
+        """Get statistics for sentences"""
+        total = len(self.sentences)
+        selected = len(self.get_selected_sentences())
+        
+        return {
+            'total_sentences': total,
+            'selected_sentences': selected,
+            'completion_rate': (selected / total * 100) if total > 0 else 0,
+            'total_pages': self.pages
+        }
+
     def get_stats(self) -> Dict[str, Any]:
-        """
-        Get overall statistics
-        """
+        """Get overall word-level statistics"""
         total_words = len(self.words)
-        selected_words = len(self.get_selected_words())
-        practiced_words = len([w for w in self.words if w["read_count"] > 0])
+        selected_words = len([w for w in self.words if w.get("selected")])
+        practiced_words = len([w for w in self.words if w.get("read_count", 0) > 0])
 
         return {
             "total_words": total_words,
