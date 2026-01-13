@@ -1,13 +1,21 @@
-flask==2.3.3
-flask-cors==4.0.0
-flask-jwt-extended
-pymongo
+# FastAPI
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Auth
+python-jose[cryptography]
 bcrypt
-pyttsx3==2.90
-SpeechRecognition==3.10.0
-PyPDF2==3.0.1
-python-dotenv==1.0.0
+pymongo
+
+# ML / Audio
 transformers
 torch
 numpy
-scipy
+soundfile
+phonemizer
+dtw-python
+
+# Utilities
+python-dotenv
+pydantic[email]
