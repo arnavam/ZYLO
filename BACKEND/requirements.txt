@@ -6,10 +6,11 @@ python-multipart
 # Auth
 python-jose[cryptography]
 bcrypt
-pymongo
+motor
 
 # ML / Audio
 transformers
+protobuf
 torch
 numpy
 soundfile
